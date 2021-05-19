@@ -33,3 +33,10 @@ python main.py --n_parallel 1 --cuda-idx 0 --eval --load-model-path /content/dat
 boxing_yin2_0 CumSteps=150000  
 boxing_small_0_v2 CumSteps=240000   
 boxing_small_1_v2 CumSteps=240000 + (200000-5e4)=390000    
+
+## References:
+1. https://github.com/juliusfrost/dreamer-pytorch
+2. https://github.com/danijar/dreamer
+3. https://github.com/danijar/dreamerv2
+4. https://github.com/google-research/dreamer
+5. Paper: https://arxiv.org/abs/1912.01603
