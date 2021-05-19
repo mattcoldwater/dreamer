@@ -87,6 +87,13 @@ class RSSMTransition(TransitionBase):
         )
 
     def forward(self, prev_action: torch.Tensor, prev_state: RSSMState):
+        """
+        We use dense neural networks for the action and value models with parameters φ and ψ , respectively.
+        The action model outputs a tanh-transformed Gaussian with sufficient statistics
+        predicted by the neural network. This allows for reparameterized sampling
+        that views sampled actions as deterministically dependent on the neural
+        network output, allowing us to backpropagate analytic gradients through the sampling operation
+        """
         rnn_input = self._rnn_input_model(torch.cat([prev_action, prev_state.stoch], dim=-1))
         deter_state = self._cell(rnn_input, prev_state.deter)
         mean, std = torch.chunk(self._stochastic_prior_model(deter_state), 2, dim=-1)

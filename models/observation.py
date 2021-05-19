@@ -3,29 +3,30 @@ import torch
 import torch.distributions as td
 import torch.nn as nn
 
-
 class ObservationEncoder(nn.Module):
     def __init__(self, depth=32, stride=2, shape=(3, 64, 64), activation=nn.ReLU):
         super().__init__()
         self.convolutions = nn.Sequential(
-            nn.Conv2d(shape[0], 1 * depth, 4, stride),
+            nn.Conv2d(shape[0], 1 * depth, 4, stride), # 32
             activation(),
-            nn.Conv2d(1 * depth, 2 * depth, 4, stride),
+            nn.Conv2d(1 * depth, 2 * depth, 4, stride), # 64
             activation(),
-            nn.Conv2d(2 * depth, 4 * depth, 4, stride),
+            nn.Conv2d(2 * depth, 4 * depth, 4, stride), # 128
             activation(),
-            nn.Conv2d(4 * depth, 8 * depth, 4, stride),
+            nn.Conv2d(4 * depth, 8 * depth, 4, stride), # 256, 2, 2
             activation(),
         )
         self.shape = shape
         self.stride = stride
         self.depth = depth
 
-    def forward(self, obs):
-        batch_shape = obs.shape[:-3]
-        img_shape = obs.shape[-3:]
-        embed = self.convolutions(obs.reshape(-1, *img_shape))
-        embed = torch.reshape(embed, (*batch_shape, -1))
+        print("Using Regular Encoder-Decoder!")
+
+    def forward(self, obs): # (Bt,Bb,1,64,64)
+        batch_shape = obs.shape[:-3] # ()
+        img_shape = obs.shape[-3:] # (1, 64, 64)
+        embed = self.convolutions(obs.reshape(-1, *img_shape)) # (B, 8d, 2, 2)
+        embed = torch.reshape(embed, (*batch_shape, -1)) #  # (50, 50, 8d*4)
         return embed
 
     @property
@@ -58,16 +59,16 @@ class ObservationDecoder(nn.Module):
         conv3_pad = output_padding_shape(conv2_shape, conv3_shape, padding, conv3_kernel_size, stride)
         conv4_shape = conv_out_shape(conv3_shape, padding, conv4_kernel_size, stride)
         conv4_pad = output_padding_shape(conv3_shape, conv4_shape, padding, conv4_kernel_size, stride)
-        self.conv_shape = (32 * depth, *conv4_shape)
+        self.conv_shape = (32 * depth, *conv4_shape) # (1024, 1, 1)
         self.linear = nn.Linear(embed_size, 32 * depth * np.prod(conv4_shape).item())
         self.decoder = nn.Sequential(
-            nn.ConvTranspose2d(32 * depth, 4 * depth, conv4_kernel_size, stride, output_padding=conv4_pad),
+            nn.ConvTranspose2d(32 * depth, 4 * depth, conv4_kernel_size, stride, output_padding=conv4_pad), # 1024-->128
             activation(),
-            nn.ConvTranspose2d(4 * depth, 2 * depth, conv3_kernel_size, stride, output_padding=conv3_pad),
+            nn.ConvTranspose2d(4 * depth, 2 * depth, conv3_kernel_size, stride, output_padding=conv3_pad), # 128-->64
             activation(),
-            nn.ConvTranspose2d(2 * depth, 1 * depth, conv2_kernel_size, stride, output_padding=conv2_pad),
+            nn.ConvTranspose2d(2 * depth, 1 * depth, conv2_kernel_size, stride, output_padding=conv2_pad), # 64-->32
             activation(),
-            nn.ConvTranspose2d(1 * depth, shape[0], conv1_kernel_size, stride, output_padding=conv1_pad),
+            nn.ConvTranspose2d(1 * depth, shape[0], conv1_kernel_size, stride, output_padding=conv1_pad), # 32-->64
         )
 
     def forward(self, x):
@@ -75,14 +76,14 @@ class ObservationDecoder(nn.Module):
         :param x: size(*batch_shape, embed_size)
         :return: obs_dist = size(*batch_shape, *self.shape)
         """
-        batch_shape = x.shape[:-1]
-        embed_size = x.shape[-1]
-        squeezed_size = np.prod(batch_shape).item()
-        x = x.reshape(squeezed_size, embed_size)
-        x = self.linear(x)
-        x = torch.reshape(x, (squeezed_size, *self.conv_shape))
-        x = self.decoder(x)
-        mean = torch.reshape(x, (*batch_shape, *self.shape))
+        batch_shape = x.shape[:-1] # (50, 50)
+        embed_size = x.shape[-1] # 230
+        squeezed_size = np.prod(batch_shape).item() # 2500
+        x = x.reshape(squeezed_size, embed_size) # (2500, 230)
+        x = self.linear(x) # (2500, 1024)
+        x = torch.reshape(x, (squeezed_size, *self.conv_shape)) # (2500, 1024, 1, 1)
+        x = self.decoder(x) # (2500, 1, 64, 64)
+        mean = torch.reshape(x, (*batch_shape, *self.shape)) # (50, 50, 1, 64, 64)
         obs_dist = td.Independent(td.Normal(mean, 1), len(self.shape))
         return obs_dist
 

@@ -7,9 +7,14 @@ from rlpyt.utils.tensor import infer_leading_dims, restore_leading_dims, to_oneh
 
 from models.action import ActionDecoder
 from models.dense import DenseModel
-from models.observation import ObservationDecoder, ObservationEncoder
+# from models.observation import ObservationDecoder, ObservationEncoder
+from models.tiny_observation import ObservationDecoder, ObservationEncoder
 from models.rnns import RSSMState, RSSMRepresentation, RSSMTransition, RSSMRollout, get_feat
 
+def get_parameter_number(net):
+    total_num = sum(p.numel() for p in net.parameters())
+    trainable_num = sum(p.numel() for p in net.parameters() if p.requires_grad)
+    return {'Total': total_num, 'Trainable': trainable_num}
 
 class AgentModel(nn.Module):
     def __init__(
@@ -35,10 +40,10 @@ class AgentModel(nn.Module):
             **kwargs,
     ):
         super().__init__()
-        self.observation_encoder = ObservationEncoder(shape=image_shape)
+        self.observation_encoder = ObservationEncoder(shape=image_shape) # {'Total': 689120  {'Total': 165312
         encoder_embed_size = self.observation_encoder.embed_size
         decoder_embed_size = stochastic_size + deterministic_size
-        self.observation_decoder = ObservationDecoder(embed_size=decoder_embed_size, shape=image_shape)
+        self.observation_decoder = ObservationDecoder(embed_size=decoder_embed_size, shape=image_shape) # {'Total': 3793249 {'Total': 1109444
         self.action_shape = action_shape
         output_size = np.prod(action_shape)
         self.transition = RSSMTransition(output_size, stochastic_size, deterministic_size, hidden_size)
